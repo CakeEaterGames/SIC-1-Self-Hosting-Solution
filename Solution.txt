@@ -1,0 +1,183 @@
+; Parse a program containing .data directives and subleq
+; instructions, then execute that program.
+;
+; All addresses used by the input program should be
+; isolated from your program's address space.
+;
+; As in any other program, if the program writes to address
+; 254 (@OUT; signed value: -2), that value should be
+; directly written out.
+;
+; If the program branches to address 255 (@HALT; signed
+; value: -1), then the program is done. Start over from
+; scratch with the next input program.
+;
+; The compiled size of each input program is <= 21 bytes.
+;
+; As in previous tasks, the .data directive will always
+; have exactly 1 value and subleq instructions will
+; specify exactly 3 addresses (separated by spaces only).
+;
+; Additionally, the input programs will not declare or use
+; any labels or variables. The only built-in addresses that
+; will be used will be referenced by address instead of
+; label (e.g. "254" will be used but "@OUT" will not).
+
+;------------------------------------------------------------------------------------;
+;                                                                                    ;
+;                                Token recognition Block                             ;
+;                                                                                    ;
+;------------------------------------------------------------------------------------;
+
+
+ subleq 0, 0, @start        ;Reserve the memory for the program
+ subleq 0, 0, 0
+ subleq 0, 0, 0
+ subleq 0, 0, 0
+ subleq 0, 0, 0
+ subleq 0, 0, 0
+ subleq 0, 0, 0
+
+@start:
+ subleq 2, 2                 ;Clear the first instruction
+
+@readToken:
+ subleq @t, @t
+ subleq @t, @IN                  ;Check what word is coming (\0 \n . s)
+ subleq @a, @a
+ subleq @a, @t, 0                
+ subleq @a, @p10, @readToken     ;Random numbers because it's faster to subtract differences between symbols
+ subleq @a, @p36, @dotToken      ;10 = 10-0    ;36 = 46-10    ;69 = 115-46
+ subleq @a, @p69, @sToken
+
+
+@dotToken:
+ subleq @i, @p1              ;Set loop variable to 1 (1 number after .data)
+ subleq @a, @p4              ;Read 5 more symbols ."data "
+@dotInLoop:                  ;By the time we get here @a is zero so no need to clear it
+ subleq @t, @IN
+ subleq @a, @n1, @dotInLoop
+ subleq @a, @a, @readNumber
+
+@sToken:
+ subleq @i, @p3              ;Set loop variable to 3 (3 numbers after subleq)
+ subleq @a, @p5              ;Read 6 more symbols s"ubleq "
+@sInLoop:                    ;By the time we get here @a is zero so no need to clear it
+ subleq @t, @IN
+ subleq @a, @n1, @sInLoop
+ subleq @a, @a, @readNumber
+
+
+
+
+;------------------------------------------------------------------------------------;
+;                                                                                    ;
+;                                   Number parsing Block                             ;
+;                                                                                    ;
+;------------------------------------------------------------------------------------;
+
+
+@readNumber:
+ subleq @a, @IN               ;@a is cleared after we get a token
+ subleq @t, @t
+ subleq @t, @a, @endOfNum     
+ subleq @t, @p32, @endOfNum   ;check if less than or equal to 32. \n or space
+ subleq @t, @p13, @foundMinus ;check if minus
+ subleq @a,@a, @skipMinus     ;I hate these "skip" instructions but at least it sets a to 0 for the loop
+
+@foundMinus:
+ subleq @isPositive, @n1      ;If there was a minus in the number set the minus flag and read another number
+ subleq @a, @a, @readNumber   ;This check is made in every digit, inefficient but short
+@skipMinus:
+
+ subleq @t, @p3               ;convert ascii to int                   
+ subleq @ml, @p9              ;Set mul loop variable to 9. Multiply 9 times (no reason to multiply 10 because we will add it later)
+@mulLoop:                     ;Since it always ends up being 1 at the end of the loop, no need to clear it
+ subleq @a,@numb
+ subleq @ml, @n1, @mulLoop
+ subleq @numb, @a             ;Add the next digit to the number
+ subleq @numb, @t             
+
+ subleq @a,@a, @readNumber    ;Read another number untill \n or space
+
+
+;------------------------------------------------------------------------------------;
+;                                                                                    ;
+;                                  Write to memory Block                             ;
+;                                                                                    ;
+;------------------------------------------------------------------------------------;
+
+@endOfNum:
+ subleq @t, @t
+ subleq @isPositive, @p0, @skipNegative
+@neg:
+ subleq @isPositive, @isPositive
+ subleq @t, @numb
+ subleq @a, @a
+ subleq @a, @t                ;Negate a number if a flag is set
+ subleq @numb, @a             ;I want to make this shorter SO BAD but idk how
+ subleq @numb, @a
+
+@skipNegative: 
+ subleq @t, @numb             ;Check if 255
+ subleq @t, @n1, @ch255
+ subleq @t, @t, @writeMem
+@ch255:
+ subleq @t, @n1, @writeMem
+ subleq @numb, @numb           ;found 255
+ subleq @numb, @resetPos
+ subleq @t, @t, @writeMem        
+
+
+@writeMem:
+ subleq 0, @numb               ;Write the number to the memory
+ subleq @writeMem, @n1         ;increment the memory pointer
+ subleq @resetLoopPtr, @n1     ;increment pointers for clearing memory
+ subleq @resetLoopPtr+1, @n1 
+ subleq @len, @p1              ;Count how long the program is
+ subleq @numb, @numb         
+ subleq @a, @a
+ subleq @i,@n1, @readNumber    ;While have more numbers, keep reading
+
+ subleq @t, @t, @readToken
+
+;------------------------------------------------------------------------------------;
+;                                                                                    ;
+;                                        Reset Block                                 ;
+;                                                                                    ;
+;------------------------------------------------------------------------------------;
+
+
+@resetLoop:
+ subleq @writeMem, @p1         
+ subleq @resetLoopPtr, @p1      ;Decrement all pointers
+ subleq @resetLoopPtr+1, @p1
+@resetLoopPtr:
+ subleq 0, 0
+ subleq @len, @n1, @resetLoop   
+ subleq @t, @t, @readToken      ;Go back to reading new tokens
+
+
+@numb: .data 0
+@t: .data 0
+@a: .data 0
+@i: .data 1
+@ml: .data 1
+@len: .data 1
+@isPositive: .data 0
+
+@n1: .data -1
+@p0: .data 0
+@p1: .data 1
+@p3: .data 3
+@p4: .data 4
+@p5: .data 5
+@p9: .data 9
+@p10: .data 10
+@p13: .data 13
+@p32: .data 32
+@p36: .data 36
+@p69: .data 69
+
+
+@resetPos: .data -64 
